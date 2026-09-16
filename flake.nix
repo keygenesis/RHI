@@ -1,4 +1,3 @@
-cat > flake.nix <<'EOF'
 {
   description = "RHI Linux for NixOS";
 
@@ -16,17 +15,10 @@ cat > flake.nix <<'EOF'
 
       src = self.outPath;
 
-      buildId =
-        builtins.substring 0 12 (
-          builtins.hashString "sha256"
-            "${toString src}:${toString pkgs.dotnet-sdk_8}"
-        );
-
       runtimeLibs = with pkgs; [
         fontconfig
         freetype
         libglvnd
-
         libX11
         libXcursor
         libXext
@@ -39,7 +31,6 @@ cat > flake.nix <<'EOF'
         libXinerama
         libICE
         libSM
-
         libxcb
         libxkbcommon
       ];
@@ -60,7 +51,7 @@ cat > flake.nix <<'EOF'
           export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}:''${LD_LIBRARY_PATH:-}"
 
           data="''${XDG_DATA_HOME:-$HOME/.local/share}/rhi-nix"
-          work="$data/${buildId}"
+          work="$data/current"
           source_copy="$work/src"
           out="$work/out"
 
@@ -78,29 +69,53 @@ cat > flake.nix <<'EOF'
               -c Release \
               --self-contained false \
               -o "$out"
-
-            echo "RHI Linux build complete."
           fi
 
           exec dotnet "$out/RHI.Linux.dll" "$@"
         '';
       };
+
+      desktopItem = pkgs.makeDesktopItem {
+        name = "rhi";
+        desktopName = "RHI";
+        genericName = "ReShade HDR Installer";
+        comment = "Manage ReShade and RenoDX for Proton games";
+        exec = "${rhi}/bin/rhi";
+        icon = "rhi";
+        terminal = false;
+        categories = [ "Game" "Utility" ];
+      };
+
+      rhiPackage = pkgs.symlinkJoin {
+        name = "rhi";
+
+        paths = [
+          rhi
+          desktopItem
+        ];
+
+        postBuild = ''
+          mkdir -p "$out/share/icons/hicolor/256x256/apps"
+          cp ${src}/RHI.Linux/Assets/rhi.png \
+            "$out/share/icons/hicolor/256x256/apps/rhi.png"
+        '';
+      };
     in
     {
       packages.${system} = {
-        default = rhi;
-        rhi = rhi;
+        default = rhiPackage;
+        rhi = rhiPackage;
       };
 
       apps.${system} = {
         default = {
           type = "app";
-          program = "${rhi}/bin/rhi";
+          program = "${rhiPackage}/bin/rhi";
         };
 
         rhi = {
           type = "app";
-          program = "${rhi}/bin/rhi";
+          program = "${rhiPackage}/bin/rhi";
         };
       };
 
@@ -111,12 +126,9 @@ cat > flake.nix <<'EOF'
         ];
 
         LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath runtimeLibs;
-
         RHI_DOTNET = "${pkgs.dotnet-sdk_8}/bin/dotnet";
-
         DOTNET_CLI_TELEMETRY_OPTOUT = "1";
         DOTNET_NOLOGO = "1";
       };
     };
 }
-EOF
