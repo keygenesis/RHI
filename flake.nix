@@ -13,7 +13,10 @@
   outputs = { nixpkgs, rhi-src, ... }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
+
+      pkgs = import nixpkgs {
+        inherit system;
+      };
 
       runtimeLibs = with pkgs; [
         fontconfig
@@ -58,9 +61,7 @@
           export DOTNET_CLI_TELEMETRY_OPTOUT=1
           export DOTNET_NOLOGO=1
 
-          export LD_LIBRARY_PATH="${
-            pkgs.lib.makeLibraryPath runtimeLibs
-          }:''${LD_LIBRARY_PATH:-}"
+          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}:''${LD_LIBRARY_PATH:-}"
 
           if [[ ! -f "$out/RHI.Linux.dll" ]]; then
             echo "Building RHI Linux..."
@@ -83,32 +84,38 @@
             "$@"
         '';
       };
-
-    in {
-      packages.${system}.default = rhi;
-      packages.${system}.rhi = rhi;
-
-      apps.${system}.default = {
-        type = "app";
-        program = "${rhi}/bin/rhi";
+    in
+    {
+      packages.${system} = {
+        default = rhi;
+        rhi = rhi;
       };
 
-      apps.${system}.rhi = {
-        type = "app";
-        program = "${rhi}/bin/rhi";
+      apps.${system} = {
+        default = {
+          type = "app";
+          program = "${rhi}/bin/rhi";
+        };
+
+        rhi = {
+          type = "app";
+          program = "${rhi}/bin/rhi";
+        };
       };
 
-      devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          dotnet-sdk_8
-          p7zip
-        ];
+      devShells.${system} = {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            dotnet-sdk_8
+            p7zip
+          ];
 
-        LD_LIBRARY_PATH =
-          pkgs.lib.makeLibraryPath runtimeLibs;
+          LD_LIBRARY_PATH =
+            pkgs.lib.makeLibraryPath runtimeLibs;
 
-        RHI_DOTNET =
-          "${pkgs.dotnet-sdk_8}/bin/dotnet";
+          RHI_DOTNET =
+            "${pkgs.dotnet-sdk_8}/bin/dotnet";
+        };
       };
     };
 }
