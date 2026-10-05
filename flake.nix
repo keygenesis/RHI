@@ -51,7 +51,7 @@
           export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}:''${LD_LIBRARY_PATH:-}"
 
           data="''${XDG_DATA_HOME:-$HOME/.local/share}/rhi-nix"
-          work="$data/current"
+          work="$data/$(basename ${src})"
           source_copy="$work/src"
           out="$work/out"
 
@@ -69,6 +69,12 @@
               -c Release \
               --self-contained false \
               -o "$out"
+
+            for old_work in "$data"/*; do
+              [[ -d "$old_work" ]] || continue
+              [[ "$old_work" == "$work" ]] && continue
+              rm -rf -- "$old_work"
+            done
           fi
 
           exec dotnet "$out/RHI.Linux.dll" "$@"
